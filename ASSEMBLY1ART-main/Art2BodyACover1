@@ -1,0 +1,108 @@
+===========Art2-BODYCover1======
+
+
+
+import os
+from build123d import *
+from ocp_vscode import show
+
+# --- Parameters ---
+base_dia = 122.0
+base_height = 5.0
+center_hole_dia = 24.0
+
+# Coordinates for mirroring (Small holes - 4 locations)
+offset_x = 15.5
+offset_y = 15.5
+
+mirrored_locs = [
+    (offset_x, offset_y),   # Top Right
+    (-offset_x, offset_y),  # Top Left
+    (-offset_x, -offset_y), # Bottom Left
+    (offset_x, -offset_y)   # Bottom Right
+]
+
+# 30mm Hole Positions - Mirrored along ZX Plane (Mirrors Y value)
+hole_30_locs = [
+    (43.30, 21.50),
+    (43.30, -21.50)
+]
+
+small_hole_dia = 3.4
+boss_dia = 6.0
+boss_height = 4.0
+z_offset = -1.0
+
+with BuildPart() as model:
+    # 1. Main Base Plate
+    with BuildSketch():
+        Circle(radius=base_dia / 2)
+    extrude(amount=base_height)
+    
+    # 2. Subtracted 30mm x 6mm Cylinders
+    with BuildSketch():
+        with Locations(hole_30_locs):
+            Circle(radius=30.0 / 2)
+    extrude(amount=6.0, mode=Mode.SUBTRACT)
+
+    # 3. Fillet ALL Vertical Edges
+    v_edges = model.edges().filter_by(Axis.Z)
+    fillet_targets = [e for e in v_edges if e.center().length > 13.0]
+    fillet(fillet_targets, radius=1.5)
+
+    # 4. Center Cutout
+    with BuildSketch():
+        Circle(radius=center_hole_dia / 2)
+    extrude(amount=base_height, mode=Mode.SUBTRACT)
+    
+    # 5. Mirrored Small Hollow Holes (3.4mm)
+    with BuildSketch() as holes:
+        with Locations(mirrored_locs):
+            Circle(radius=small_hole_dia / 2)
+    extrude(amount=base_height, mode=Mode.SUBTRACT)
+    
+    # 6. Mirrored 6mm Cylinders
+    with BuildSketch() as bosses:
+        with Locations(mirrored_locs):
+            Circle(radius=boss_dia / 2)
+    extrude(bosses.sketch.moved(Location((0, 0, z_offset))), amount=boss_height, mode=Mode.SUBTRACT)
+
+    # 7. Slot (Mirrored along XZ plane: Y=37 and Y=-37)
+    with BuildSketch() as slot_sketch_7:
+        with Locations((28, 37.00), (28, -37.00)):
+            SlotOverall(width=6.4, height=3.4)
+    extrude(slot_sketch_7.sketch.moved(Location((0, 0, 3))), amount=base_height, mode=Mode.SUBTRACT)
+
+    # 8. Slot (Mirrored along XZ plane: Y=37 and Y=-37)
+    with BuildSketch() as slot_sketch_8:
+        with Locations((28, 37.00), (28, -37.00)):
+            SlotOverall(width=8.9, height=5.9)
+    extrude(slot_sketch_8.sketch.moved(Location((0, 0, -2))), amount=base_height, mode=Mode.SUBTRACT)
+
+    # 9. Slot (Mirrored along XZ plane: Y=6 and Y=-6)
+    with BuildSketch() as slot_sketch_9:
+        with Locations((28, 6.00), (28, -6.00)):
+            SlotOverall(width=6.4, height=3.4)
+    extrude(slot_sketch_9.sketch.moved(Location((0, 0, 3))), amount=base_height, mode=Mode.SUBTRACT)
+
+    # 10. Slot (Mirrored along XZ plane: Y=6 and Y=-6)
+    with BuildSketch() as slot_sketch_10:
+        with Locations((28, 6.00), (28, -6.00)):
+            SlotOverall(width=8.9, height=5.9)
+    extrude(slot_sketch_10.sketch.moved(Location((0, 0, -2))), amount=base_height, mode=Mode.SUBTRACT)
+
+# --- Export Section ---
+# This saves the file to your Desktop
+desktop_path = os.path.expanduser("~/Desktop/bearing_model.stl")
+export_stl(model.part, desktop_path)
+print(f"Model exported to: {desktop_path}")
+
+show(model)
+
+
+
+
+O.Body Volume= 48171.909mm^3
+N.Body Volume= 48207.691mm^3
+
+Symmetry is same 

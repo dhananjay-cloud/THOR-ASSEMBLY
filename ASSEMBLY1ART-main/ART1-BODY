@@ -1,0 +1,137 @@
+============ART1-BODY=====
+
+
+
+
+
+
+from build123d import *
+from ocp_vscode import show
+import math
+import os
+
+# --- 1. Dimensions & Calculations ---
+hollow_dia = 50
+h_total = 18 
+
+cyl_data = [
+    {"dia": 150, "h": 5},
+    {"dia": 94,  "h": 12},
+    {"dia": 70,  "h": 18}
+]
+
+tri_base = 3.2
+tri_slant = 3.35
+tri_height = math.sqrt(tri_slant**2 - (tri_base / 2)**2)
+
+# --- MANUAL CONTROLS ---
+trapezoid_coords = (28, 22, 18)
+trapezoid_rotation = (90, 0, 0)
+trapezoid_thickness = 5
+
+rat_coords = (44.5, 30, 18)
+rat_rotation = (90, 0, 90)
+rat_thickness = 8
+
+hex_coords = (45, 26, 23)      
+hex_rotation = (0, -45, 0)    
+hex_side_length = 3.35
+hex_thickness = 4
+
+sub_cyl_coords = (40, 26, 29)
+sub_cyl_rotation = (0, -40, 0)
+sub_cyl_dia = 3.4
+sub_cyl_height = 15 
+
+# Counterbore Pattern Controls
+cb_radius = 30
+cb_z_start = -1
+cb_dia_small = 3.4
+cb_h_small = 17
+cb_dia_large = 5.9
+cb_h_large = 2
+
+with BuildPart() as component:
+    # A. Base Geometry (Stacked cylinders)
+    for cyl in cyl_data:
+        with BuildSketch(Plane.XY.offset(h_total - cyl['h'])):
+            Circle(radius=cyl['dia'] / 2)
+        extrude(amount=cyl['h'])
+    
+    # B. Central bore
+    with BuildSketch(Plane.XY):
+        Circle(radius=hollow_dia / 2)
+    extrude(amount=20, mode=Mode.SUBTRACT)
+
+    # --- C. Group features for Mirroring ---
+    with BuildPart() as all_new_features:
+        # 1. Trapezoid Profile
+        trapezoid_loc = Location(trapezoid_coords, trapezoid_rotation)
+        with BuildPart() as trap_part:
+            with BuildSketch(Plane(trapezoid_loc)) as profile_sketch:
+                Polygon([(0, 0), (39.904, 0), (39.904, 25), (25, 25)], align=(Align.MIN, Align.MIN))
+            extrude(amount=trapezoid_thickness)
+            chamfer_edge = trap_part.edges().filter_by(Axis.Z).sort_by(Axis.X)[0]
+            chamfer(chamfer_edge, length=4.99, angle=20)
+        
+        # 2. Right Angle Triangle
+        rat_loc = Location(rat_coords, rat_rotation)
+        with BuildSketch(Plane(rat_loc)) as rat_sketch:
+            Polygon([(0, 0), (16.5, 0), (0, 16.5)], align=(Align.MIN, Align.MIN))
+        extrude(amount=rat_thickness)
+
+        # 3. Hexagon (Subtract)
+        hex_loc = Location(hex_coords, hex_rotation)
+        with BuildSketch(Plane(hex_loc)) as hex_sketch:
+            RegularPolygon(radius=hex_side_length, side_count=6)
+        extrude(amount=hex_thickness, mode=Mode.SUBTRACT)
+
+        # 4. Subtractive Cylinder
+        sub_cyl_loc = Location(sub_cyl_coords, sub_cyl_rotation)
+        with Locations(sub_cyl_loc):
+            Cylinder(radius=sub_cyl_dia / 2, height=sub_cyl_height, mode=Mode.SUBTRACT)
+
+        # 5. Legacy Features
+        with BuildPart() as legacy_features:
+            cuboid_loc = Location((31.5, 50, 33), (180, 0, 0))
+            with Locations(cuboid_loc):
+                Box(23, 10, 15, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Box(5.803, 3, 8.675, mode=Mode.SUBTRACT, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            
+            with Locations(Location((31.5, 50, 25), (90, 0, 0))):
+                Cylinder(radius=3.4 / 2, height=10, mode=Mode.SUBTRACT)
+
+            with BuildSketch(Plane(Location((31.5, 50, 24.44), (90, 90, 180)))) as tri_sketch:
+                Polygon([(-tri_base/2, 0), (tri_base/2, 0), (0, tri_height)], align=(Align.CENTER, Align.MIN))
+            extrude(tri_sketch.sketch, amount=2.95, mode=Mode.SUBTRACT, both=True)
+
+    # --- D. Apply Global Mirroring ---
+    add(all_new_features.part) 
+    mirrored_y = mirror(all_new_features.part, Plane.XZ)
+    add(mirrored_y) 
+    combined = [all_new_features.part, mirrored_y]
+    add(mirror(combined, Plane.YZ)) 
+
+    # --- E. Circular Pattern Counterbore ---
+    with PolarLocations(radius=cb_radius, count=3, angular_range=360):
+        with Locations(Location((0, 0, cb_z_start))):
+            Cylinder(radius=cb_dia_small / 2, height=cb_h_small, 
+                     align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+        with Locations(Location((0, 0, cb_z_start + cb_h_small))):
+            Cylinder(radius=cb_dia_large / 2, height=cb_h_large, 
+                     align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+# --- F. EXPORT TO DESKTOP ---
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "ART1_Model.stl")
+export_stl(component.part, desktop_path)
+print(f"File exported to: {desktop_path}")
+
+show(component)
+
+
+
+
+O.Body Volume = 1.541E + 05mm^3
+N.Body Volume = 1.540E + 05mm^3
+
+Symmetry is same 

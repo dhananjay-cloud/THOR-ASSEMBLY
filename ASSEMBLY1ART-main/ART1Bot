@@ -1,0 +1,91 @@
+==========ART1Bot========
+NEED TO ADD JUST LAST FEATURE IN THE MODEL REST ITS DONE.
+
+
+
+from build123d import *
+from ocp_vscode import show
+import math
+
+# --- Constants ---
+base_dia = 110.138
+base_height = 30.0
+chamfer_val = 10.461
+hollow_od, hollow_id, hollow_height = 70.0, 50.0, 12.0
+sub_dia, sub_height = 109.138, 9.0
+
+# --- Gear Calculations ---
+teeth = 50
+pitch_dia = 97.0
+outer_dia = 104.0
+thickness = 14.0
+module = pitch_dia / teeth
+pitch_rad = pitch_dia / 2
+outer_rad = outer_dia / 2
+
+hub_rad = pitch_dia / 2 
+tooth_base_rad = hub_rad 
+tooth_tip_rad = outer_rad
+
+helix_angle = 45.0
+total_twist = (thickness * math.tan(math.radians(helix_angle)) / pitch_rad) * (180 / math.pi)
+
+# --- Hexagon Calculation ---
+hex_dia = 2.901
+hex_height = 6.5
+# Radius for RegularPolygon is vertex distance. Flats dia is 2.901.
+hex_radius = hex_dia / (2 * math.cos(math.radians(30)))
+
+# --- 1. CREATE THE GEAR TOOL ---
+with BuildPart() as gear_tool:
+    Cylinder(radius=hub_rad, height=thickness, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    w_base, w_top = module * 1.5, module * 0.7
+    h_tooth = tooth_tip_rad - tooth_base_rad
+    pts = [(-w_base/2, 0), (w_base/2, 0), (w_top/2, h_tooth), (-w_top/2, h_tooth)]
+
+    for i in range(teeth):
+        angle_start = i * (360/teeth)
+        angle_end = angle_start + total_twist
+        with BuildSketch(Plane.XY) as s1:
+            with Locations(Rotation(0, 0, angle_start)):
+                with Locations((0, tooth_base_rad)):
+                    Polygon(pts)
+        with BuildSketch(Plane.XY.offset(thickness)) as s2:
+            with Locations(Rotation(0, 0, angle_end)):
+                with Locations((0, tooth_base_rad)):
+                    Polygon(pts)
+        loft()
+
+# --- 2. MAIN BODY ---
+with BuildPart() as model:
+    # Base
+    Cylinder(radius=base_dia / 2, height=base_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    chamfer(model.faces().sort_by(Axis.Z)[-1].edges(), length=chamfer_val)
+    
+    # Hollow Ring
+    with Locations((0, 0, 25)):
+        Cylinder(radius=hollow_od / 2, height=hollow_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # Bottom Pocket
+    with Locations((0, 0, 0)):
+        Cylinder(radius=sub_dia / 2, height=sub_height, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+    # 50mm Through-Hole
+    Cylinder(radius=50.0 / 2, height=100.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+
+    # Circular Pattern of 3.4mm holes (Radius 30)
+    with PolarLocations(radius=60/2, count=3):
+        Cylinder(radius=3.4 / 2, height=100.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+
+    # Subtract the Gear Tool (at Z=4.5)
+    with Locations((0, 0, 4.5)):
+        add(gear_tool.part, mode=Mode.SUBTRACT)
+
+    # --- UPDATED HEXAGON CUT ---
+    # Centered at the same X, Y as the circles (X=0, Y=30) and shifted to Z=4.5
+    with Locations((0, 30, 4.5)):
+        with BuildSketch() as hex_sk:
+            RegularPolygon(radius=hex_radius, side_count=6)
+        extrude(amount=hex_height, mode=Mode.ADD)
+
+show(model)

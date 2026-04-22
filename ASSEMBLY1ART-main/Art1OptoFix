@@ -1,0 +1,81 @@
+============OPTOFIX============
+
+
+from build123d import *
+from ocp_vscode import show
+
+with BuildPart() as p:
+    # 1. Create the base cuboid (54x15x3)
+    Box(54, 15, 3)
+    
+    # 2. Apply initial offset 
+    p.part = p.part.move(Pos(0, 11, 0))
+    
+    # 3. First cut: Dia 28mm
+    with BuildSketch(Plane.XY.offset(1.5)) as s1:
+        with Locations((6, 29.50)):
+            Circle(radius=28/2)
+    extrude(amount=-4, mode=Mode.SUBTRACT)
+
+    # 4. Second cut: Dia 3.40mm
+    with BuildSketch(Plane.XY.offset(1.5)) as s2:
+        with Locations((-9.50, 14)):
+            Circle(radius=3.40/2)
+    extrude(amount=-4, mode=Mode.SUBTRACT)
+    
+    # 5. Third Cut: Dia 3.40mm
+    with BuildSketch(Plane.XY.offset(1.5)) as s3:
+        with Locations((21.50, 14)):
+            Circle(radius=3.40/2)
+    extrude(amount=-4, mode=Mode.SUBTRACT)
+
+    # 6. New Cuboid Addition (10x25x3)
+    # Block center at Y=-5, height 3, so top is Z=-1.5, front face is Y=-17.5
+    with Locations(Pos(-22, -5, -3)): 
+        Box(10, 25, 3) 
+
+    # 7. Fourth Cut: Cylinder
+    with BuildSketch(Plane.XY.offset(-1.5)) as s4:
+        with Locations((-22.00, -4.50)):
+            Circle(radius=3.4/2)
+    extrude(amount=-4, mode=Mode.SUBTRACT)
+
+    # 8. Fifth Cut: Cylinder
+    with BuildSketch(Plane.XY.offset(-1.5)) as s5:
+        with Locations((-22.00, -14.50)):
+            Circle(radius=3.4/2)
+    extrude(amount=-4, mode=Mode.SUBTRACT)
+
+    # 9. PREVIOUS FILLET (Inner Edge)
+    inner_edge = (
+        p.edges()
+        .filter_by(Axis.X)
+        .filter_by(lambda e: abs(e.center().Y - 7.5) < 0.1)
+        .filter_by(lambda e: abs(e.center().Z - (-1.5)) < 0.1)
+        
+    )
+    if inner_edge:
+        fillet(inner_edge, radius=1.0)
+
+    # 10. NEW FILLET: Front face and Top face join edge (0.5mm)
+    # The front-most edge of that block is at Y = -17.5
+    front_top_edge = (
+        p.edges()
+        .filter_by(Axis.X)
+        .filter_by(lambda e: abs(e.center().Y - (17.5)) < 0.1)
+        .filter_by(lambda e: abs(e.center().Z - (-1.5)) < 0.1)
+        .filter_by(lambda e: abs(e.center().Z - (1.5)) < 0.1)
+        
+    )
+    
+    if front_top_edge:
+        fillet(front_top_edge, radius=0.5)
+
+# 11. View in OCP CAD Viewer
+show(p)
+
+
+O.BODY Volume = 3162.139mm^3
+N.BODY Volume = 2967.07mm^3
+
+symmetry is same 

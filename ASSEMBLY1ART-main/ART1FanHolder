@@ -1,0 +1,95 @@
+
+============FAN HOLDER=======
+
+
+
+
+import os
+import math
+from build123d import *
+from ocp_vscode import show
+
+# Ensure STL saves in script folder
+try:
+    os.chdir(os.path.dirname(__file__))
+except:
+    pass
+
+# --- Configuration Variables ---
+plate_w, plate_l, plate_h = 40, 40, 3
+hole_dia = 38
+hole_h = 5
+chamfer_val = 2
+fillet_val = 4
+
+# Cuboid dimensions
+small_box_w, small_box_d, small_box_h = 10, 6, 3
+small_hole_dia = 3.4
+small_hole_h = 15  
+
+# Hexagon dimensions
+hex_flat_dist = 5.65
+hex_height = 5.0  
+hex_radius = hex_flat_dist / (2 * math.cos(math.radians(30)))
+hex_rotation = 16  # New rotation variable
+
+# Position for cuboids
+off_x, off_y, off_z = 0, -25, 0   
+rot_x, rot_y, rot_z = 0, 0, 90     
+
+# Target Y-position for the hole
+hole_y_pos = -26.0
+
+with BuildPart() as model:
+    # 1. Base Plate
+    Box(plate_w, plate_l, plate_h)
+    
+    # 2. Chamfer
+    c_edge = model.edges().filter_by(Axis.Y).sort_by(Axis.Z)[:2].sort_by(Axis.X)[0]
+    chamfer(c_edge, length=chamfer_val)
+    
+    # 3. Fillet
+    f_edges = model.edges().filter_by(Axis.Z).sort_by(Axis.X)[-2:]
+    fillet(f_edges, radius=fillet_val)
+    
+    # 4. Small Cuboids (Additive)
+    custom_loc = Location((off_x, off_y, off_z), (rot_x, rot_y, rot_z))
+    with BuildPart(custom_loc) as small_box_part:
+        Box(small_box_w, small_box_d, small_box_h, align=Align.CENTER)
+    add(mirror(small_box_part.part, about=Plane.XZ))
+    
+    # 5. Cut holes in both cuboids - Offset to -26mm
+    with Locations((0, hole_y_pos, 0), (0, -hole_y_pos, 0)):
+        Cylinder(radius=small_hole_dia / 2, height=small_hole_h, mode=Mode.SUBTRACT)
+
+    # 6. Main Central Hole
+    Cylinder(radius=hole_dia / 2, height=hole_h, mode=Mode.SUBTRACT)
+
+    # 7. Corner Holes (3.4mm)
+    with GridLocations(x_spacing=32, y_spacing=32, x_count=2, y_count=2):
+        Cylinder(radius=3.4 / 2, height=10, mode=Mode.SUBTRACT)
+
+    # 8. Mirrored & Rotated Hexagons (Subtractive)
+    with BuildSketch(Plane.XY.offset(-4)) as hex_sk:
+        with GridLocations(x_spacing=32, y_spacing=32, x_count=2, y_count=2):
+            # Applying the 20 degree rotation here
+            with Locations(Rotation(0, 0, hex_rotation)):
+                RegularPolygon(radius=hex_radius, side_count=6)
+    extrude(hex_sk.sketch, amount=hex_height, mode=Mode.SUBTRACT)
+
+# --- EXPORT SECTION ---
+try:
+    export_stl(model.part, "Fan_Holder_Final.stl")
+    print(f"Success: STL exported with 6.7mm hexagons rotated by {hex_rotation} degrees.")
+except Exception as e:
+    print(f"Export Error: {e}")
+
+# --- VIEW SECTION ---
+show(model)
+
+
+
+Orignal STL VOLUME = 1300.429mm^3
+New Component Volume made with build123d = 1314.712mm^3
+
+Symmetry is same 

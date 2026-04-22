@@ -1,0 +1,175 @@
+=======Common Bearing==========
+
+
+
+
+import os
+from build123d import *
+from ocp_vscode import show
+
+# --- ADJUST LOCATION MANUALLY HERE ---
+pos_x = 11.0
+pos_y = 0.0
+pos_z = 0.8  
+# -------------------------------------
+
+with BuildPart() as model:
+    # 1. Base Cuboid
+    Box(30, 6.5, 4)
+    
+    # 2. Large Center Cylinder (Dia 15.80)
+    Cylinder(radius=15.80 / 2, height=4)
+    
+    # 3. Center Hollow (Dia 10)
+    Cylinder(radius=10 / 2, height=5, mode=Mode.SUBTRACT)
+    
+    # 4. Offset Features (Mirrored)
+    with Locations((pos_x, pos_y, pos_z), (-pos_x, pos_y, pos_z)):
+        # Larger hole (Dia 5.90)
+        Cylinder(radius=5.90 / 2, height=3.5, mode=Mode.SUBTRACT)
+        
+        # 3.50mm Cylinder (Subtracted)
+        Cylinder(radius=3.50 / 2, height=8.0, mode=Mode.SUBTRACT)
+
+# --- CORRECT EXPORT METHOD ---
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "common_bearing.stl")
+
+# We use the export_stl function directly on the part
+export_stl(model.part, desktop_path)
+
+print(f"File exported successfully to: {desktop_path}")
+
+show(model)
+
+
+
+O.Volume= 670.35mm^3
+New.Model Volume= 669.69mm^3
+
+Symmetry is same 
+
+=========Art2MotorGear========
+
+
+import math
+from build123d import *
+from ocp_vscode import show
+
+# --- Parameters ---
+teeth = 10
+pcd = 18.794
+inner_dia = 15.0
+height = 23 - 8
+helix_angle = -25.0 
+
+# Base Parameters
+base_dia = 24.0
+base_thickness = 8.0
+
+# Rectangular Subtraction Parameters
+rect_size = (3, 5.802, 5.675)
+rect_dist_from_center = 5.85
+rect_angle = 83               
+rect_local_rotation = 90      
+rect_z_pos = -5.17             
+
+# --- CYLINDER SUBTRACTIONS ---
+cyl1_hole_dia = 3.40
+cyl1_loc = Rotation(0, 0, -7) * Pos(-10, 0, -4.5) * Rotation(0, 90, 0) 
+cyl2_hole_dia = 5.90
+cyl2_loc = Rotation(0, 0, -7) * Pos(-21.3, 0, -4.5) * Rotation(0, 90, 0) 
+
+# --- TRIANGLE MANUAL CONTROLS ---
+tri_base = 5.802
+tri_height = 3.35
+tri_thick = 3
+tri_x_move = 0.0   
+tri_y_move = 1.5 
+tri_z_move = 1.67
+tri_rot_x = 90.0  
+tri_rot_y = 0.0   
+tri_rot_z = 0.0  
+
+rect_top_z = rect_z_pos + (rect_size[2] / 2) 
+tri_loc = Rotation(0, 0, rect_angle) * Pos(0, rect_dist_from_center, rect_top_z) * Pos(tri_x_move, tri_y_move, tri_z_move) * Rotation(tri_rot_x, tri_rot_y, tri_rot_z)
+
+# Calculated Values
+pitch_radius = pcd / 2
+inner_radius = inner_dia / 2
+total_rotation = (height * math.tan(math.radians(helix_angle)) * 360) / (2 * math.pi * pitch_radius)
+
+with BuildPart() as gear_obj:
+    # 1. Hub
+    Cylinder(radius=inner_radius, height=height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+    # 2. Base
+    with BuildSketch(Plane.XY) as base_sketch:
+        Circle(radius=base_dia / 2)
+    extrude(base_sketch.sketch, amount=-base_thickness, mode=Mode.ADD)
+
+    # 3. TOOTH PROFILE WITH OUTWARD (CONVEX) CURVES
+    with BuildSketch() as tooth_profile:
+        with BuildLine():
+            # Points
+            p1 = (2.568 / 2, inner_radius - 0.3)  # Bottom Right
+            p2 = (3.216 / 2, pitch_radius)         # Middle Right (Max bulge)
+            p3 = (1.175 / 2, 24.0 / 2)            # Top Right
+            p4 = (-1.175 / 2, 24.0 / 2)           # Top Left
+            p5 = (-3.216 / 2, pitch_radius)        # Middle Left (Max bulge)
+            p6 = (-2.568 / 2, inner_radius - 0.3) # Bottom Left
+            
+            # Draw profile
+            Line(p6, p1) # Bottom
+            # Spline with tangents that push outward
+            # Tangent (0.5, 1) means go slightly right while going up
+            Spline(p1, p2, p3, tangents=((0.5, 1), (-0.5, 1))) 
+            Line(p3, p4) # Top
+            # Tangent (-0.5, -1) means go slightly left while going down
+            Spline(p4, p5, p6, tangents=((-0.5, -1), (0.5, -1)))
+        make_face()
+
+    # 4. Helical teeth
+    with BuildPart() as single_helical_tooth:
+        with BuildSketch(Plane.XY) as s1:
+            add(tooth_profile.sketch)
+        with BuildSketch(Plane.XY.offset(height)) as s2:
+            with Locations(Rotation(0, 0, total_rotation)):
+                add(tooth_profile.sketch)
+        loft(ruled=False)
+
+    # 5. Pattern
+    with PolarLocations(0, teeth):
+        add(single_helical_tooth.part, mode=Mode.ADD)
+
+    # 6. Center Spline Cut
+    with BuildSketch(Plane.XY.offset(-base_thickness)) as custom_cut:
+        with BuildLine():
+            Line((-2.83, -1.27), (-2.31, 2.06))
+            Spline((-2.31, 2.06), (1.36, 2.79), (3.09, -0.24), 
+                   (1.74, -2.57), (-1.21, -2.85), (-2.83, -1.27))
+        make_face()
+    extrude(custom_cut.sketch, amount=height + base_thickness, mode=Mode.SUBTRACT)
+
+    # 7. Rectangular Cut
+    rect_loc = Rotation(0, 0, rect_angle) * Pos(0, rect_dist_from_center, rect_z_pos) * Rotation(0, 0, rect_local_rotation)
+    with Locations(rect_loc):
+        Box(rect_size[0], rect_size[1], rect_size[2], mode=Mode.SUBTRACT)
+
+    # 8. Cylinder Cuts
+    with Locations(cyl1_loc):
+        Cylinder(radius=cyl1_hole_dia / 2, height=base_dia, mode=Mode.SUBTRACT)
+    with Locations(cyl2_loc):
+        Cylinder(radius=cyl2_hole_dia / 2, height=base_dia, mode=Mode.SUBTRACT)
+
+    # 9. Triangle Subtraction
+    with BuildSketch(tri_loc) as tri_sketch:
+        with BuildLine():
+            t_pts = [(-tri_base/2, -tri_height/2), (tri_base/2, -tri_height/2), (0, tri_height/2), (-tri_base/2, -tri_height/2)]
+            Polyline(t_pts)
+        make_face()
+    extrude(tri_sketch.sketch, amount=tri_thick, mode=Mode.SUBTRACT)
+
+# --- EXPORT TO DESKTOP ---
+export_stl(gear_obj.part, "/Users/softage/Desktop/gearmotor_v2.stl")
+
+show(gear_obj)

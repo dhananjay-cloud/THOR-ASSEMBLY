@@ -1,0 +1,69 @@
+==========OPTO-DISK======
+
+
+
+from build123d import *
+from ocp_vscode import show
+import math
+import os
+
+# --- Dimensions ---
+inner_r, outer_r = 28.20, 29.20
+height_arc, angle_deg = 15.0, 192.4
+c_len, c_wid, c_ht = 56.40, 7.0, 5.0
+
+# New Feature Dimensions
+cut_x, cut_y, cut_z = 10.0, 1.1, 4.0
+
+with BuildPart() as obj:
+    # 1. Arc Feature
+    with BuildSketch() as sk:
+        with BuildLine():
+            l1 = CenterArc((0, 0), outer_r, 0, angle_deg)
+            end_inner = (inner_r * math.cos(math.radians(angle_deg)), 
+                         inner_r * math.sin(math.radians(angle_deg)))
+            l2 = Line(l1 @ 1, end_inner)
+            l3 = CenterArc((0, 0), inner_r, angle_deg, -angle_deg)
+            l4 = Line(l3 @ 1, l1 @ 0)
+        make_face()
+    extrude(amount=height_arc)
+
+    # 2. Cuboid (Rotated 5 degrees)
+    with Locations(Rotation(0, 0, 5)):
+        Box(c_len, c_wid, c_ht, align=(Align.CENTER, Align.MIN, Align.MIN))
+
+    # 3 & 4. Small Cylinder Holes
+    with Locations(Rotation(0, 0, 5) * Location((25, 3.5, 0))):
+        c1 = Cylinder(radius=3.4/2, height=2.1, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+    with Locations(Rotation(0, 0, 5) * Location((25, 3.5, 2))):
+        c2 = Cylinder(radius=5.9/2, height=3.1, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+    # 5. Mirror the small holes
+    mirror_plane = Plane.YZ.rotated((0, 0, 5))
+    mirror(objects=[c1, c2], about=mirror_plane, mode=Mode.SUBTRACT)
+
+    # 6. Central Cylinder Subtraction
+    Cylinder(radius=43/2, height=10, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+   # 7. Cuboid rotated 90 degrees on the Z-axis (spinning on its center)
+    # Location syntax: ((X, Y, Z), (RotX, RotY, RotZ))
+    # Setting the Z-rotation to 90
+    with Locations(Location((0, 28.04, 10), (90, 0, 90))):
+        Box(cut_x, cut_y, cut_z, align=Align.CENTER, mode=Mode.SUBTRACT)
+
+# --- EXPORT ---
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "OPTO_DISK.stl")
+try:
+    export_stl(obj.part, desktop_path)
+except:
+    obj.part.export_stl(desktop_path)
+
+if __name__ == "__main__":
+    show(obj)
+
+
+
+O.BODY VOLUME =1742.758mm^3
+N.BODY VOLUME =1709.129mm^3
+
+Symmetry is same 
