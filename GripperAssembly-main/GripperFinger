@@ -1,0 +1,79 @@
+==========GripperFinger========
+
+import os
+from build123d import *
+from ocp_vscode import show
+
+# ==========================================
+#              CONTROL PANEL
+# ==========================================
+h1_x, h1_y, h1_z = -7.6, -3.25, -14
+h2_x, h2_y, h2_z = -26.0, 5.25, -14
+
+c1_loc = (-26.0, 5.25, 7)
+c2_loc = (-7.6, -3.25, 7)
+c_dia, c_height = 5.9, 5.0
+
+hex_side, hex_thick = 3.4, 10.0 
+# ==========================================
+
+with BuildPart() as obj:
+    # 1. Main Body
+    Box(60, 18.5, 15)
+    
+    # 2. Vertical Corner Fillets
+    v_edges = obj.edges().filter_by(Axis.Z)
+    fillet(v_edges.sort_by(Axis.X)[0], 10)
+    fillet(v_edges.sort_by(Axis.X)[-1], 18.49)
+    
+    # 3. Horizontal Edge Fillets (Front Top and Front Bottom)
+    # Get straight edges parallel to X
+    h_edges = obj.edges().filter_by(Axis.X).filter_by(GeomType.LINE)
+    
+    # Sort by Y to find the Front edges, then pick by Z
+    front_edges = h_edges.sort_by(Axis.Y)[-2:] # Get the two edges with highest Y
+    front_top = front_edges.sort_by(Axis.Z)[-1]
+    front_bottom = front_edges.sort_by(Axis.Z)[0]
+    
+    fillet([front_top, front_bottom], 1.5)
+
+    # 4. Hexagons
+    with BuildSketch(Location((h1_x, h1_y, h1_z))):
+        RegularPolygon(radius=hex_side, side_count=6)
+    extrude(amount=hex_thick, mode=Mode.SUBTRACT)
+
+    with BuildSketch(Location((h2_x, h2_y, h2_z), (0, 0, 30))):
+        RegularPolygon(radius=hex_side, side_count=6)
+    extrude(amount=hex_thick, mode=Mode.SUBTRACT)
+
+    # 5. Round Holes
+    with Locations((-7.6, -3.25), (-26.0, 5.25)):
+        Cylinder(radius=3.4/2, height=30, mode=Mode.SUBTRACT)
+
+    # 6. Large Cylinders
+    with Locations(c1_loc, c2_loc):
+        Cylinder(radius=c_dia/2, height=c_height, mode=Mode.SUBTRACT)
+
+    # 7. Central Cut
+    with Locations(Location((-17.5, 0, 0), (90, 0, 0))):
+        Box(30.0, 5.35, 45.0, mode=Mode.SUBTRACT)
+
+# --- EXPORT SECTION ---
+desktop_path = os.path.expanduser("~/Desktop/gripper_finger.stl")
+export_stl(obj.part, desktop_path)
+
+print(f"Success! Model exported with Front fillets to: {desktop_path}")
+
+# View result
+show(obj, names=["gripper_finger"])
+
+
+O.Body Volume = 12590.99mm^3
+N.Body Volume = !2119.62mm^3
+
+Symmetry is same 
+
+
+
+
+

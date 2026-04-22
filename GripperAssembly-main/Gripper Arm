@@ -1,0 +1,42 @@
+import os
+from build123d import *
+from ocp_vscode import show
+
+with BuildPart() as obj:
+    # --- Feature 1: The Box ---
+    Box(4, 5, 30.2)
+    # Fillet long edges (parallel to Z)
+    long_edges = obj.edges().filter_by(Axis.Z)
+    fillet(long_edges, 0.75)
+    
+    # --- Feature 2: Two Hollow Cylinders ---
+    # Locations along the 30.2mm length (Z axis)
+    cyl_pos = [Location((0, 0, 17.4)), Location((0, 0, -17.4))]
+    
+    for loc in cyl_pos:
+        # Create cylinder standing up first to fillet easily
+        with BuildPart(mode=Mode.PRIVATE) as single_cyl:
+            # OD 7mm, Height 5mm
+            Cylinder(radius=7/2, height=5)
+            # ID 3.4mm, Subtract
+            Cylinder(radius=3.4/2, height=5, mode=Mode.SUBTRACT)
+            
+            # Fillet the top and bottom outer edges (Radius 3.5)
+            c_edges = single_cyl.edges().filter_by(GeomType.CIRCLE).filter_by(lambda e: e.radius == 3.5)
+            fillet(c_edges, 0.75)
+        
+        # Add the pre-filleted cylinder to the main object
+        add(single_cyl.part.moved(loc * Rotation(0, 90, 0)))
+
+    # --- Global Orientation ---
+    obj.part.location = Location((0, 0, 0)) * Rotation(0, 90, 0)
+
+# --- View in ocp-cad-viewer ---
+show(obj)
+
+# --- Export to STL on Desktop ---
+# This automatically finds your user folder and saves to the Desktop
+desktop_path = os.path.expanduser("~/Desktop/gripper_arm.stl")
+export_stl(obj.part, desktop_path)
+
+print(f"File successfully exported to: {desktop_path}")

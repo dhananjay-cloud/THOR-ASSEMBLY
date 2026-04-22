@@ -1,0 +1,111 @@
+===========Gripper Passive Arm=========
+
+
+
+
+import os
+from build123d import *
+from ocp_vscode import show_object
+import math
+
+# --- Parameters ---
+teeth = 26
+thickness = 5
+hole_dia = 3
+pitch_dia = 28.21
+module = 1.085
+
+# Your thickness specs
+outer_t = 0.796
+mid_t = 1.849
+root_t = 1.945
+
+# Triangle Specs
+tri_base = 2.6  
+tri_height = 1.5 
+tri_pos = (15.2, 0, 5)
+
+# Rectangle Specs
+rect_dim = (5, 4, 20) # Width, Depth, Length
+rect_loc = (22.4, 0, 2.5)
+rect_rot = (0, 90, 0)
+
+# Hollow Cylinder Specs
+cyl_loc = (34.8, 0, 2.5) 
+cyl_outer_dia = 7
+cyl_inner_dia = 3.4
+cyl_height = 5
+
+# Radial positions
+r_outer = (pitch_dia / 2) + module
+r_mid = pitch_dia / 2
+r_root = (pitch_dia / 2) - (1.25 * module)
+
+with BuildPart() as gear_part:
+    # 1. Create the Hub
+    with BuildSketch(Plane.XY) as hub:
+        Circle(radius=r_root)
+    extrude(amount=thickness)
+    
+    # 2. Create the Spline Tooth Profile
+    with BuildSketch(Plane.XY) as tooth_sketch:
+        with BuildLine() as outline:
+            p1, p2, p3 = (r_root, root_t / 2), (r_mid, mid_t / 2), (r_outer, outer_t / 2)
+            p4, p5, p6 = (r_outer, -outer_t / 2), (r_mid, -mid_t / 2), (r_root, -root_t / 2)
+            Spline([p1, p2, p3]); Line(p3, p4); Spline([p4, p5, p6]); Line(p6, p1)
+        make_face()
+
+    # 3. Pattern and Extrude Teeth
+    with PolarLocations(0, teeth):
+        add(tooth_sketch)
+    extrude(amount=thickness)
+    
+    # 4. Center Hole
+    with BuildSketch(Plane.XY.offset(thickness)) as hole:
+        Circle(radius=hole_dia / 2)
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
+
+    # 5. Subtract Circular Triangular Ring
+    with BuildSketch(Plane.XZ) as ring_cut:
+        with Locations((tri_pos[0], tri_pos[2])):
+            Polygon([ (0, 0), (-tri_base, 0), (0, -tri_height) ])
+    revolve(axis=Axis.Z, mode=Mode.SUBTRACT)
+
+    # 6. Add Filleted Rectangle
+    with BuildPart(mode=Mode.ADD) as extra_arm:
+        with Locations(Location(rect_loc, rect_rot)):
+            Box(rect_dim[0], rect_dim[1], rect_dim[2])
+            long_edges = extra_arm.edges().filter_by(Axis.X)
+            fillet(long_edges, 0.75)
+
+    # 7. Add Hollow Filleted Cylinder
+    with BuildPart(mode=Mode.ADD) as lug:
+        with Locations(cyl_loc):
+            Cylinder(radius=cyl_outer_dia/2, height=cyl_height)
+            cyl_edges = lug.edges().filter_by(GeomType.CIRCLE)
+            fillet(cyl_edges, 0.75)
+            Cylinder(radius=cyl_inner_dia/2, height=cyl_height, mode=Mode.SUBTRACT)
+
+# --- EXPORT SECTION ---
+# This automatically finds your desktop and saves the file
+desktop_path = os.path.expanduser("~/Desktop/gripper_pressure_arm.stl")
+export_stl(gear_part.part, desktop_path)
+
+print(f"File successfully saved to: {desktop_path}")
+
+# 8. View result
+show_object(gear_part)
+
+
+
+
+
+******************************
+
+O.BODY VOLUME = 2587.734mm^3
+N.BODY VOLUME = 2531.516mm^3
+
+Symmetric is same 
+
+
+******************************
