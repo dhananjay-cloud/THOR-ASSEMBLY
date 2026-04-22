@@ -1,4 +1,15 @@
-# Thor-AssemblyArt4
+The Thor robotic arm consists of six sub-assemblies. All .stl files have been converted into structured .py scripts.
+
+For the Art4 component, we used a CSV-based extraction method where all coordinate points were captured via a Python script and then consolidated into a new script to reconstruct the model.
+
+In a second approach, we derived parametric dimensions by converting .stl files into STEP format, measuring key parameters, and rebuilding the model using Gemanu Cloud and AI tools. The resulting model closely matches the original in terms of volume and symmetry.
+
+The .py scripts are designed to directly generate models in OCP and also export them as .stl files (notably for the Base Assembly and Art1 Assembly). The scripts have been kept simple, clear, and outcome-focused.
+
+Additionally, README files have been included in each folder, aligned with the assembly structure for easy navigation and understanding.
+
+
+===============================================# Thor-AssemblyArt4 ======================================
 
 Parametric reconstruction of the [Thor Open-Source Robot Arm](https://github.com/AngelLM/Thor) assembly parts using **build123d** — a Python CAD kernel built on OpenCascade.
 
