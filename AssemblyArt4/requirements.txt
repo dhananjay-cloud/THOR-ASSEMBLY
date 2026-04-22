@@ -1,0 +1,6 @@
+build123d
+ocp_vscode
+numpy-stl
+trimesh
+manifold3d
+rtree
